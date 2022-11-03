@@ -17,7 +17,9 @@
 package com.google.cloud.solutions.realtimedash.pipeline;
 
 import java.util.Map;
+import com.google.auto.value.AutoValue;
 
+@AutoValue
 public abstract class LogEvent{
   public Object before;
   public Map<String, Object> after;
