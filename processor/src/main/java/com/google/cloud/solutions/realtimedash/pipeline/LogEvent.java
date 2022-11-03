@@ -25,13 +25,8 @@ import java.util.Map;
 /**
  * Data model represents the message sent to Pub/Sub Module.
  */
-@JsonDeserialize(builder = AutoValue_LogEvent.Builder.class)
 @AutoValue
 public abstract class LogEvent implements Serializable {
-
-  public static Builder builder() {
-    return new AutoValue_LogEvent.Builder();
-  }
 
   public Object before;
   public Map<String, Object> after;
