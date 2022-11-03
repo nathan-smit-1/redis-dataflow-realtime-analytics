@@ -73,45 +73,6 @@ public final class MetricsCalculationPipeline {
     pipeline.run();
   }
 
-  private static SingleOutput<Pair<String, String>, KV<String, String>>
-  hllKeyGenerator(String name) {
-    return
-        ParDo.of(new DoFn<Pair<String, String>, KV<String, String>>() {
-          @ProcessElement
-          public void buildHllKey(ProcessContext context) {
-            Pair<String, String> elem = context.element();
-            context.output(
-                KV.of("hll_" + buildPrefix(name) + elem.getKey(), elem.getValue()));
-          }
-        });
-  }
-
-  private static SingleOutput<Pair<String, String>, KV<String, String>> setKeyGenerator(
-      String name) {
-    return ParDo.of(
-        new DoFn<Pair<String, String>, KV<String, String>>() {
-          @ProcessElement
-          public void buildSetKey(ProcessContext context) {
-            Pair<String, String> elem = context.element();
-            context.output(
-                KV.of("set_" + buildPrefix(name) + elem.getKey(), elem.getValue()));
-          }
-        });
-  }
-
-  private static SingleOutput<LogEvent, Pair<String, String>> extractUsersForDateTime() {
-    return ParDo.of(
-        new DoFn<LogEvent, Pair<String, String>>() {
-          @ProcessElement
-          public void extractDateTimeForUser(ProcessContext context) {
-            LogEvent elem = context.element();
-            context.output(
-                Pair.of(elem.getTimestamp().toString(timeBasedKeyBuilder(null)),
-                    elem.getUid()));
-          }
-        });
-  }
-
   private static String timeBasedKeyBuilder(String prefix) {
     return (prefix == null ? "" : ("'" + buildPrefix(prefix) + "'")) + "yyyy_MM_dd'T'HH_mm";
   }
