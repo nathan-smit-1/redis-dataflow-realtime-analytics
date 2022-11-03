@@ -16,16 +16,28 @@
 
 package com.google.cloud.solutions.realtimedash.pipeline;
 
-import java.util.Map;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.auto.value.AutoValue;
+import java.io.Serializable;
+import org.joda.time.DateTime;
+import java.util.Map;
 
+/**
+ * Data model represents the message sent to Pub/Sub Module.
+ */
+@JsonDeserialize(builder = AutoValue_LogEvent.Builder.class)
 @AutoValue
-public abstract class LogEvent{
+public abstract class LogEvent implements Serializable {
+
+  public static Builder builder() {
+    return new AutoValue_LogEvent.Builder();
+  }
+
   public Object before;
   public Map<String, Object> after;
   public Map<String, Object> source;
   public String op;
   public long ts_ms;
   public Object transaction;
-}
 
+ }
