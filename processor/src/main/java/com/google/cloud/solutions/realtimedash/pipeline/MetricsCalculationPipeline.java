@@ -64,7 +64,7 @@ public final class MetricsCalculationPipeline {
               public void getStockMovement(ProcessContext context) {
                 LogEvent event = context.element();
                 context.output(
-                    KV.of("example_key", "1"));
+                    KV.of(event.after.get("PACK_SLIP_NO"), event.after.get("NO_OF_PICKS_PER_CARTON")));
               }
             }
         ))
