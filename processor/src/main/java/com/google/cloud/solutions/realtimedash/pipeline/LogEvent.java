@@ -26,7 +26,7 @@ import java.util.Map;
  * Data model represents the message sent to Pub/Sub Module.
  */
 @AutoValue
-public abstract class LogEvent implements Serializable {
+public class LogEvent implements Serializable {
 
   public Object before;
   public Map<String, Object> after;
