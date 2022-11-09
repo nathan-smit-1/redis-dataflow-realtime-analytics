@@ -25,7 +25,7 @@
     <name>processor</name>
 
     <properties>
-        <beam.version>2.20.0</beam.version>
+        <beam.version>2.42.0</beam.version>
         <junit.version>4.13.1</junit.version>
         <maven.compiler.release>8</maven.compiler.release>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -154,7 +154,7 @@
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>libraries-bom</artifactId>
-                <version>5.4.0</version>
+                <version>26.1.4</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

@@ -28,14 +28,20 @@ import org.apache.beam.sdk.transforms.DoFn;
 /**
  * Pipeline operation to parse the Pub/Sub message as JSON into a POJO.
  */
-public final class ParseMessageAsLogElement extends DoFn<String, LogEvent> {
+public final class ParseMessageAsLogElement extends DoFn<String, BranchCompanySkuValue> {
 
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   @ProcessElement
   public void parseStringToLogElement(ProcessContext context) {
     try {
-      context.output(buildReader().readValue(context.element()));
+      LogEvent logEvent = buildReader().readValue(context.element());
+      BranchCompanySkuValue branchCompanySkuValue = 
+              new BranchCompanySkuValue(logEvent.after.get("branch_id_no").toString(),
+                                        "",
+                                        logEvent.after.get("sku_no").toString(),
+                                        logEvent.after.get("value").toString());
+      context.output(branchCompanySkuValue);
     } catch (IOException ioexp) {
       logger.atWarning().atMostEvery(10, TimeUnit.SECONDS).withCause(ioexp).log();
     }

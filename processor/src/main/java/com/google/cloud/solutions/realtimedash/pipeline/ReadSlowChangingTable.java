@@ -1,6 +1,17 @@
 package com.google.cloud.solutions.realtimedash.pipeline;
 
-import com.google.cloud.bigquery.*;
+import com.google.cloud.bigquery.BigQuery;
+import com.google.cloud.bigquery.BigQueryException;
+import com.google.cloud.bigquery.BigQueryOptions;
+import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.Job;
+import com.google.cloud.bigquery.JobId;
+import com.google.cloud.bigquery.JobInfo;
+import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.QueryResponse;
+import com.google.cloud.bigquery.TableResult;
+import com.google.common.collect.ImmutableMap;
+import java.util.UUID;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
@@ -36,26 +47,15 @@ public class ReadSlowChangingTable extends PTransform<PCollection<Long>, PCollec
                 BigQuery bigquery = BigQueryOptions.getDefaultInstance().getService();
 
                 QueryJobConfiguration queryConfig =
-                        QueryJobConfiguration.newBuilder(
-                                query)
-                                .setUseLegacySql(false)
+                        QueryJobConfiguration.newBuilder(query)
                                 .build();
 
                 // Create a job ID so that we can safely retry.
                 JobId jobId = JobId.of(UUID.randomUUID().toString());
-                Job queryJob = bigquery.create(JobInfo.newBuilder(queryConfig).setJobId(jobId).build());
-
+                Job queryJob = bigquery.create(JobInfo.of(jobId, queryConfig)); 
                 // Wait for the query to complete.
                 queryJob = queryJob.waitFor();
 
-                // Check for errors
-                if (queryJob == null) {
-                    throw new RuntimeException("Job no longer exists");
-                } else if (queryJob.getStatus().getError() != null) {
-                    // You can also look at queryJob.getStatus().getExecutionErrors() for all
-                    // errors, not just the latest one.
-                    throw new RuntimeException(queryJob.getStatus().getError().toString());
-                }
 
                 // Get the results.
                 QueryResponse response = bigquery.getQueryResults(jobId);

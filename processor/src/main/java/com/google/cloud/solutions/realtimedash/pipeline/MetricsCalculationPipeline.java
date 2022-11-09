@@ -32,14 +32,16 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
 import org.apache.beam.sdk.transforms.MapElements;
-import com.google.cloud.solutions.realtimedash.pipeline.BigQueryMyData.MyData;
-import com.google.cloud.solutions.realtimedash.pipeline.MapBranchToCompany;
+import com.google.cloud.solutions.realtimedash.pipeline.BranchCompanySkuValue;
 import java.util.List;
 import java.util.Map;
 import org.apache.beam.sdk.io.GenerateSequence;
+import org.apache.beam.sdk.transforms.Partition;
+import org.apache.beam.sdk.transforms.Partition.PartitionFn;
 import org.apache.beam.sdk.transforms.View;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
+import org.apache.beam.sdk.values.PCollectionList;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.joda.time.Duration;
@@ -60,14 +62,14 @@ public final class MetricsCalculationPipeline {
         MetricsPipelineOptions options = extractPipelineOptions(args);
         Pipeline pipeline = Pipeline.create(options);
 
-        String project = "grp-data-prod-rdl";
-        String dataset = "central_pos_rdl_vw";
+        String project = "sg-apps-store-fulfillment-dev";
+        String dataset = "testing";
         String table = "central_branch_vw";
 
         String query = String.format("SELECT branch_id, cpy_id FROM `%s.%s.%s`;",
                 project, dataset, table);
 
-        final PCollectionView<Map<String, String>> sideInput = pipeline
+        final PCollectionView<Map<String, String>> branches = pipeline
                 // Emitted long data trigger this batch read BigQuery client job.
                 .apply(String.format("Updating every %s hours", 10),
                  GenerateSequence.from(0).withRate(1, Duration.standardHours(10)))
@@ -80,27 +82,51 @@ public final class MetricsCalculationPipeline {
                 // Caching results as Map.
                 .apply("View As Map", View.<String, String>asMap());
 
-        PCollection<LogEvent> parsedLoggedEvents
+        PCollection<BranchCompanySkuValue> parsedLoggedEvents
                 = pipeline
                         .apply("Read PubSub Events",
                                 PubsubIO.readStrings().fromTopic(options.getInputTopic()))
                         .apply("Parse Message JSON",
                                 ParDo.of(new ParseMessageAsLogElement()));
+     
+        PCollection<BranchCompanySkuValue> output = parsedLoggedEvents.apply(
+         ParDo
+           .of(new AddCompanyDataToMessage(branches))
+           // the side input is provided here and above
+           // now the city map is available for the transform to use
+           .withSideInput("branches", branches)
+       );
+        
+        //create partitions based on company
+        
+        PCollectionList<BranchCompanySkuValue> msgs = parsedLoggedEvents.apply(Partition.of(2, new PartitionFn<BranchCompanySkuValue>() {
+            public int partitionFor(BranchCompanySkuValue msg, int numPartitions) {
+                // TODO: determine how to partition messages
+                if (msg.getCompany() == "1") {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            }
+        }));
 
-        RedisIO.Write redisWriter
-                = RedisIO.write()
-                        .withEndpoint(
-                                options.getRedisHost(), options.getRedisPort());
+PCollection<BranchCompanySkuValue> partition1 = msgs.get(0);
 
-        //visit counter
-        parsedLoggedEvents
+RedisIO.Write redisWriter = RedisIO.write().withEndpoint(options.getRedisHost(), 
+                                                         options.getRedisPort());
+        
+        //stock movement updater
+        partition1
                 .apply("Get stock movement from message", ParDo.of(
-                        new DoFn<LogEvent, KV<String, String>>() {
+                        new DoFn<BranchCompanySkuValue, KV<String, String>>() {
                     @ProcessElement
                     public void getStockMovement(ProcessContext context) {
-                        LogEvent event = context.element();
+                        BranchCompanySkuValue updateValue = context.element();
                         context.output(
-                                KV.of(event.after.get("PACK_SLIP_NO").toString(), event.after.get("NO_OF_PICKS_PER_CARTON").toString()));
+                                KV.of(updateValue.getBranch() 
+                                        + "|" + updateValue.getCompany()
+                                        + "|" + updateValue.getSku()
+                                                , updateValue.getValue()));
                     }
                 }
                 ))
@@ -108,15 +134,7 @@ public final class MetricsCalculationPipeline {
 
         pipeline.run();
     }
-
-    private static String timeBasedKeyBuilder(String prefix) {
-        return (prefix == null ? "" : ("'" + buildPrefix(prefix) + "'")) + "yyyy_MM_dd'T'HH_mm";
-    }
-
-    private static String buildPrefix(String prefix) {
-        return (prefix == null || prefix.equals("")) ? "" : prefix + "_";
-    }
-
+    
     /**
      * Parse Pipeline options from command line arguments.
      */
